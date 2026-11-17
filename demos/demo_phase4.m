@@ -5,7 +5,7 @@
 % Runs the robot (CV prediction + DWA) through the busiest 30 s of the
 % ETH scene twice: without uncertainty, and with speed-normalised split
 % conformal radii (90% target) inflating every predicted person. The
-% animation draws the 1.6 / 3.2 / 4.8 s conformal rings in orange.
+% animation draws the 1.6 s and 3.2 s conformal rings in orange.
 here = fileparts(mfilename('fullpath'));
 run(fullfile(here, '..', 'startup.m'));
 root = fullfile(here, '..');

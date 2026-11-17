@@ -273,7 +273,12 @@ the conformal methods is 90.0% by construction.
 | kalman | conformal speed | 64% | 0.65 / 1.75 / 3.04 |
 | kalman | Kalman covariance | 98% | 1.84 / 4.85 / 8.69 |
 | sf | conformal speed | 65% | 0.68 / 1.76 / 3.06 |
-GP_ROWS
+| lstm | conformal plain | 57% | 0.48 / 1.19 / 2.04 |
+| lstm | conformal speed | 65% | 0.63 / 1.67 / 2.88 |
+| lstm | ACI plain | 90% | 1.67 / 3.74 / 6.86 |
+| gp | conformal speed | 67% | 0.67 / 1.75 / 3.02 |
+| gp | ACI plain | 90% | 1.69 / 4.16 / 7.49 |
+| gp | GP predictive σ | 61% (val 88%) | 0.49 / 1.28 / 2.23 |
 
 What this shows:
 
@@ -287,8 +292,15 @@ What this shows:
    smaller step size (γ = 0.003) ACI gives 85% coverage with 1.6 m at 1.6 s.
    There is a real trade-off between coverage and how much room the robot
    has left.
-3. **Model-based uncertainty is over-cautious.** The Kalman covariance
-   covers 98% with circles 3–4 times bigger than conformal ones.
+3. **A better predictor pays off through uncertainty, not directly.** With
+   ACI, the LSTM needs circles about 30% smaller than constant velocity
+   (1.67 vs 2.39 m at 1.6 s) for the same 90% coverage. This is the first
+   place where the networks' better ADE gives the planner something useful.
+4. **Model-based uncertainty is either over- or under-confident.** The
+   Kalman covariance covers 98% with circles 3–4 times bigger than
+   conformal ones. The GP is well calibrated on validation (88%) but, like
+   conformal, drops to 61% on ETH. The GP's own accuracy (ETH ADE/FDE
+   1.02 / 2.12 m, val 0.46 / 0.99) is on par with the networks.
 
 ### Does uncertainty make the robot safer? (DWA, 120 episodes)
 
@@ -315,5 +327,8 @@ margins should pay off, because a planner that reasons over time can wait
 or detour instead of getting boxed in.
 
 `demo_phase4` shows CV + DWA with and without conformal margins on the
-busiest part of ETH. The orange rings are the 1.6 / 3.2 / 4.8 s conformal
-circles.
+busiest part of ETH. The orange rings are the 1.6 s and 3.2 s conformal
+circles. In that scene the margins make things worse (3 contacts and 53 s
+instead of 0 contacts and 33 s): the 90% circles for fast walkers cover
+most of the corridor, so the robot detours and gets caught. This is the
+coverage-versus-room trade-off from the tables, in one picture.
