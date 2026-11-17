@@ -46,6 +46,8 @@ end
 % progress: end of rollout vs a point further along the A* path
 if isempty(path)
     goalPt = x(1:2);
+elseif size(path, 2) >= 3                  % space-time plan: where it wants us at the end
+    goalPt = ref_at(path, x, tNow, Th, cfg.vmax);
 else
     d = hypot(path(:, 1) - x(1), path(:, 2) - x(2));
     [~, i0] = min(d);

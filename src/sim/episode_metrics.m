@@ -41,4 +41,15 @@ m.pathRatio = m.pathLen / hypot(log.task.goal(1) - log.task.start(1), ...
 m.freezeFrac = mean(abs(log.u(:, 1)) < 0.05);
 m.intrusions = nnz(log.clear < 0.5) * dt;
 m.meanPlanMs = mean(log.planMs);
+% Phase 5, reactive crowd: how far the robot pushed people away from
+% where they would have walked without a robot (the same simulated crowd
+% run with no robot): sum over people, averaged over time (m), and the
+% largest single push.
+m.crowdDisp = 0; m.maxDev = 0;
+if isfield(log, 'dev')
+    s = cellfun(@(d) sum(d), log.dev);
+    mx = cellfun(@(d) max([0; d(:)]), log.dev);
+    m.crowdDisp = mean(s);
+    m.maxDev = max(mx);
+end
 end

@@ -1,10 +1,12 @@
-function T = exp_navigation(predName, nStarts, outFile, controller, popt, tag)
+function T = exp_navigation(predName, nStarts, outFile, controller, popt, tag, cfgArgs)
 %EXP_NAVIGATION  Same episodes for any predictor -> one CSV row each.
 %   exp_navigation('kalman')            % 10 start times x 2 directions x 6 scenes
 %   exp_navigation('none', 5, 'results/nav_none.csv')
 %   exp_navigation('kalman', 10, '', 'dwa')   % DWA local controller
 %   exp_navigation('kalman', 10, '', 'dwa', struct('alpha', 0.1, 'cpMode', 'speed'), 'cp10s')
 %                                               % + 90% conformal circles (Phase 4)
+%   exp_navigation('cv', 10, '', 'mpc', struct(), 'sta_react', {'planner', 'sta', 'crowd', 'reactive'})
+%                                               % Phase 5: any sim_config settings
 %   Start times are spread evenly over each recording, so every
 %   predictor faces exactly the same crowds.
 if nargin < 2, nStarts = 10; end
@@ -13,6 +15,7 @@ root = fullfile(here, '..');
 if nargin < 4, controller = 'pp'; end
 if nargin < 5, popt = struct(); end
 if nargin < 6, tag = ''; end
+if nargin < 7, cfgArgs = {}; end
 label = [predName '+' controller];
 if ~isempty(tag), label = [label '+' tag]; end
 if nargin < 3 || isempty(outFile)
@@ -20,7 +23,7 @@ if nargin < 3 || isempty(outFile)
 end
 run(fullfile(root, 'startup.m'));
 files = dir(fullfile(root, 'data', 'raw', '*.txt'));
-cfg = sim_config('controller', controller);
+cfg = sim_config('controller', controller, cfgArgs{:});
 cfg.obstacleFcn = make_obstacle_fcn(predName, popt);
 rows = {};
 for f = 1:numel(files)
@@ -32,7 +35,7 @@ for f = 1:numel(files)
             rows(end + 1, :) = {label, m.scene, m.t0, flip, m.reached, ...
                 m.success, m.collisions, m.minClear, m.timeToGoal, ...
                 m.pathRatio, m.freezeFrac, m.intrusions, m.meanPlanMs, ...
-                m.faultCollisions, m.successNoFault}; %#ok<AGROW>
+                m.faultCollisions, m.successNoFault, m.crowdDisp, m.maxDev}; %#ok<AGROW>
         end
     end
     fprintf('%s: %s done\n', label, S.name);
@@ -40,9 +43,9 @@ end
 d = fileparts(outFile);
 if ~isempty(d) && ~exist(d, 'dir'), mkdir(d); end
 fid = fopen(outFile, 'w');
-fprintf(fid, 'predictor,scene,t0,flip,reached,success,collisions,minClear,timeToGoal,pathRatio,freezeFrac,intrusions,planMs,faultCollisions,successNoFault\n');
+fprintf(fid, 'predictor,scene,t0,flip,reached,success,collisions,minClear,timeToGoal,pathRatio,freezeFrac,intrusions,planMs,faultCollisions,successNoFault,crowdDisp,maxDev\n');
 for r = 1:size(rows, 1)
-    fprintf(fid, '%s,%s,%.1f,%d,%d,%d,%d,%.3f,%.2f,%.3f,%.3f,%.1f,%.1f,%d,%d\n', rows{r, :});
+    fprintf(fid, '%s,%s,%.1f,%d,%d,%d,%d,%.3f,%.2f,%.3f,%.3f,%.1f,%.1f,%d,%d,%.3f,%.3f\n', rows{r, :});
 end
 fclose(fid);
 T = rows;
