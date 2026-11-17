@@ -2,7 +2,9 @@ function fn = make_predictor(name, opts)
 %MAKE_PREDICTOR  Common handle for every predictor:
 %   Y = fn(H, predLen, dt)  with H n x obsLen x 2 (everyone in the scene
 %   at that moment), Y n x predLen x 2.
-%   Names: 'cv', 'cv2' (2-step velocity average), 'kalman', 'sf'.
+%   Names: 'cv', 'cv2' (2-step velocity average), 'kalman', 'sf', and the
+%   trained networks 'mlp', 'lstm', 'tcn', 'sgcnn', 'tf' (models/*.mat,
+%   made by train_predictors).
 if nargin < 2, opts = struct(); end
 switch lower(name)
     case 'cv'
@@ -14,6 +16,9 @@ switch lower(name)
         fn = @(H, L, dt) predict_kalman(H, L, dt, opts);
     case 'sf'
         fn = @(H, L, dt) predict_social_force(H, L, dt, opts);
+    case {'mlp', 'lstm', 'tcn', 'sgcnn', 'tf'}
+        nm = lower(name);
+        fn = @(H, L, dt) predict_learned(H, L, dt, nm);
     otherwise
         error('make_predictor:name', 'Unknown predictor %s', name);
 end

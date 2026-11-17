@@ -3,3 +3,4 @@ results/*
 *.asv
 *.mex*
 .DS_Store
+models/*.mat
