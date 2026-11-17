@@ -15,7 +15,8 @@ function [log, m] = run_episode(S, task, cfg)
 %   The crowd is replayed, so people do not react to the robot.
 if nargin < 3, cfg = sim_config(); end
 G = grid_make(task.bounds, cfg.res);
-lim.vmax = cfg.vmax; lim.wmax = cfg.wmax;
+lim.vmax = cfg.vmax; lim.wmax = cfg.wmax; lim.vmin = 0;
+if strcmpi(cfg.controller, 'dwa'), lim.vmin = cfg.vmin; end
 nSteps = round(cfg.Tmax / cfg.dt);
 replanK = max(1, round(cfg.replanEvery / cfg.dt));
 
@@ -32,6 +33,7 @@ log.path = cell(nSteps, 1);
 log.planMs = [];
 log.pred = cell(nSteps, 1);
 lastPred = [];
+uPrev = [0 0];
 reached = false;
 for k = 1:nSteps
     t = task.t0 + (k - 1) * cfg.dt;
@@ -64,10 +66,16 @@ for k = 1:nSteps
         % below stops the robot if someone is in the way.
     end
 
-    [v, w] = pure_pursuit(x, path, cfg.lookahead, cfg.vmax, cfg.wmax);
-    v = v * min(max((clr - cfg.dStop) / (cfg.dSlow - cfg.dStop), 0), 1);
     dGoal = hypot(task.goal(1) - x(1), task.goal(2) - x(2));
-    v = min(v, max(dGoal, 0.2));   % ease in to the goal
+    if strcmpi(cfg.controller, 'dwa')
+        [v, w] = dwa_control(x, path, lastPred, P, t, uPrev, cfg);
+        v = sign(v) * min(abs(v), max(dGoal, 0.2));
+    else
+        [v, w] = pure_pursuit(x, path, cfg.lookahead, cfg.vmax, cfg.wmax);
+        v = v * min(max((clr - cfg.dStop) / (cfg.dSlow - cfg.dStop), 0), 1);
+        v = min(v, max(dGoal, 0.2));   % ease in to the goal
+    end
+    uPrev = [v w];
 
     log.t(k) = t; log.x(k, :) = x; log.u(k, :) = [v w];
     log.clear(k) = clr; log.nPeds(k) = numel(ids);

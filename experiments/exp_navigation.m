@@ -1,16 +1,20 @@
-function T = exp_navigation(predName, nStarts, outFile)
+function T = exp_navigation(predName, nStarts, outFile, controller)
 %EXP_NAVIGATION  Same episodes for any predictor -> one CSV row each.
 %   exp_navigation('kalman')            % 10 start times x 2 directions x 6 scenes
 %   exp_navigation('none', 5, 'results/nav_none.csv')
+%   exp_navigation('kalman', 10, '', 'dwa')   % DWA local controller
 %   Start times are spread evenly over each recording, so every
 %   predictor faces exactly the same crowds.
 if nargin < 2, nStarts = 10; end
 here = fileparts(mfilename('fullpath'));
 root = fullfile(here, '..');
-if nargin < 3, outFile = fullfile(root, 'results', ['nav_' predName '.csv']); end
+if nargin < 4, controller = 'pp'; end
+if nargin < 3 || isempty(outFile)
+    outFile = fullfile(root, 'results', ['nav_' predName '_' controller '.csv']);
+end
 run(fullfile(root, 'startup.m'));
 files = dir(fullfile(root, 'data', 'raw', '*.txt'));
-cfg = sim_config();
+cfg = sim_config('controller', controller);
 cfg.obstacleFcn = make_obstacle_fcn(predName);
 rows = {};
 for f = 1:numel(files)
@@ -19,7 +23,7 @@ for f = 1:numel(files)
     for t0 = linspace(0, Tlen - cfg.Tmax - 1, nStarts)
         for flip = [false true]
             [~, m] = run_episode(S, scene_task(S, t0, flip), cfg);
-            rows(end + 1, :) = {predName, m.scene, m.t0, flip, m.reached, ...
+            rows(end + 1, :) = {[predName '+' controller], m.scene, m.t0, flip, m.reached, ...
                 m.success, m.collisions, m.minClear, m.timeToGoal, ...
                 m.pathRatio, m.freezeFrac, m.intrusions, m.meanPlanMs}; %#ok<AGROW>
         end

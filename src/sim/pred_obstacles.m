@@ -17,12 +17,16 @@ C = P;
 r = repmat(hardR, size(P, 1), 1);
 viz.ids = zeros(0, 1);
 viz.Y = zeros(0, 12, 2);
+viz.P0 = zeros(0, 2);
+viz.tObs = t;
 k = floor(t / S.dt + 1e-9) + 1;
 [hid, H] = scene_history(S, k, popt.obsLen);
 if isempty(hid), return; end
 Y = fn(H, popt.predLen, S.dt);
 viz.ids = hid;
 viz.Y = Y;
+viz.P0 = reshape(fill_history(H(:, end, :)), [], 2);   % positions at tObs
+viz.tObs = (k - 1) * S.dt;                             % scene time of the last frame
 tau = (k - 1) * S.dt + (1:popt.predLen) * S.dt - t;   % seconds ahead
 use = tau <= popt.horizon;
 Yx = Y(:, use, 1); Yy = Y(:, use, 2);

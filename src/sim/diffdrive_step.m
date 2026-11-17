@@ -3,7 +3,9 @@ function x = diffdrive_step(x, u, dt, lim)
 %   x = [px py theta], u = [v w] (m/s, rad/s). lim = struct with vmax,
 %   wmax; commands are saturated before integration. Uses the exact
 %   arc update so large w does not distort the path.
-v = min(max(u(1), 0), lim.vmax);
+vmin = 0;
+if isfield(lim, 'vmin'), vmin = lim.vmin; end
+v = min(max(u(1), vmin), lim.vmax);
 w = min(max(u(2), -lim.wmax), lim.wmax);
 th = x(3);
 if abs(w) < 1e-6
