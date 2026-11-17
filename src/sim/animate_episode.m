@@ -24,6 +24,8 @@ plot(ax, log.task.goal(1), log.task.goal(2), 'p', 'MarkerSize', 16, ...
 hTrail = plot(ax, nan, nan, '.', 'Color', [0.6 0.6 0.6], 'MarkerSize', 4);
 hPed = patch(ax, nan, nan, [0.25 0.45 0.85], 'EdgeColor', 'none', 'FaceAlpha', 0.85);
 hPred = plot(ax, nan, nan, '--', 'Color', [0.45 0.6 0.9], 'LineWidth', 1);
+hUnc = plot(ax, nan, nan, '-', 'Color', [0.95 0.55 0.15], 'LineWidth', 0.75);
+uncSteps = [4 8 12];                     % 1.6, 3.2, 4.8 s uncertainty rings
 hPath = plot(ax, nan, nan, '-', 'Color', [0.1 0.65 0.3], 'LineWidth', 1.5);
 hDone = plot(ax, nan, nan, '-', 'Color', [0.85 0.2 0.2], 'LineWidth', 1);
 hRob = patch(ax, nan, nan, [0.85 0.2 0.2], 'EdgeColor', 'k');
@@ -71,8 +73,22 @@ for k = 1:o.every:numel(log.t)
         px = [reshape(Y(:, :, 1)', [], n); nan(1, n)];
         py = [reshape(Y(:, :, 2)', [], n); nan(1, n)];
         set(hPred, 'XData', px(:), 'YData', py(:));
+        ux = nan; uy = nan;
+        if isfield(log.pred{k}, 'R') && ~isempty(log.pred{k}.R) && any(log.pred{k}.R(:) > 0)
+            R = log.pred{k}.R;
+            ux = []; uy = [];
+            for h = uncSteps(uncSteps <= size(Y, 2))
+                cx = Y(:, h, 1)' + R(:, h)' .* circ(:, 1);
+                cy = Y(:, h, 2)' + R(:, h)' .* circ(:, 2);
+                ux = [ux; [cx; nan(1, n)]]; %#ok<AGROW>
+                uy = [uy; [cy; nan(1, n)]]; %#ok<AGROW>
+            end
+            ux = ux(:); uy = uy(:);
+        end
+        set(hUnc, 'XData', ux, 'YData', uy);
     else
         set(hPred, 'XData', nan, 'YData', nan);
+        set(hUnc, 'XData', nan, 'YData', nan);
     end
     p = log.path{k};
     if isempty(p), p = [nan nan]; end
