@@ -45,4 +45,14 @@ S = D.scenes(1);
 assert(~isempty(ids) && size(P, 2) == 2 && ~isempty(PA));
 pass = pass + 1;
 
-fprintf('All %d tests passed.\n', pass);
+fprintf('All %d Phase 1 tests passed.\n', pass);
+
+% Phase 2: predictors
+H = zeros(2, 8, 2); H(1, :, 1) = (0:7) * 0.4; H(2, :, 2) = (0:7) * 0.2;   % 1 m/s in x, 0.5 m/s in y
+Y = predict_cv(H, 12, 0.4);
+assert(abs(Y(1, end, 1) - (2.8 + 12 * 0.4)) < 1e-9 && abs(Y(2, end, 2) - (1.4 + 12 * 0.2)) < 1e-9);
+Yk = predict_kalman(H, 12, 0.4);
+assert(max(abs(Yk(:) - Y(:))) < 0.1);           % noise-free line: Kalman ~ CV
+Ys = predict_social_force(H, 12, 0.4);
+assert(all(isfinite(Ys(:))) && isequal(size(Ys), [2 12 2]));
+fprintf('Phase 2 predictor tests passed.\n');

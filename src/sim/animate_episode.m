@@ -23,6 +23,7 @@ plot(ax, log.task.goal(1), log.task.goal(2), 'p', 'MarkerSize', 16, ...
     'MarkerFaceColor', [0.95 0.75 0.1], 'MarkerEdgeColor', 'k');
 hTrail = plot(ax, nan, nan, '.', 'Color', [0.6 0.6 0.6], 'MarkerSize', 4);
 hPed = patch(ax, nan, nan, [0.25 0.45 0.85], 'EdgeColor', 'none', 'FaceAlpha', 0.85);
+hPred = plot(ax, nan, nan, '--', 'Color', [0.45 0.6 0.9], 'LineWidth', 1);
 hPath = plot(ax, nan, nan, '-', 'Color', [0.1 0.65 0.3], 'LineWidth', 1.5);
 hDone = plot(ax, nan, nan, '-', 'Color', [0.85 0.2 0.2], 'LineWidth', 1);
 hRob = patch(ax, nan, nan, [0.85 0.2 0.2], 'EdgeColor', 'k');
@@ -64,6 +65,15 @@ for k = 1:o.every:numel(log.t)
     T = cat(1, log.P{k0:k});
     if isempty(T), T = [nan nan]; end
     set(hTrail, 'XData', T(:, 1), 'YData', T(:, 2));
+    if isfield(log, 'pred') && ~isempty(log.pred{k}) && ~isempty(log.pred{k}.Y)
+        Y = log.pred{k}.Y;
+        n = size(Y, 1);
+        px = [reshape(Y(:, :, 1)', [], n); nan(1, n)];
+        py = [reshape(Y(:, :, 2)', [], n); nan(1, n)];
+        set(hPred, 'XData', px(:), 'YData', py(:));
+    else
+        set(hPred, 'XData', nan, 'YData', nan);
+    end
     p = log.path{k};
     if isempty(p), p = [nan nan]; end
     set(hPath, 'XData', p(:, 1), 'YData', p(:, 2));

@@ -17,7 +17,7 @@ cfg = struct( ...
     'goalTol',     0.3,  ... % goal reached within this distance (m)
     'dSlow',       1.0,  ... % start slowing when clearance to a person < dSlow (m)
     'dStop',       0.15, ... % stop when clearance < dStop (m)
-    'obstacleFcn', []    ... % hook: @(S,t,ids,P,V,cfg) -> [centers radii]
+    'obstacleFcn', []    ... % hook: @(S,t,ids,P,V,cfg,x) -> [centers radii viz], see make_obstacle_fcn
     );
 cfg = parse_opts(cfg, varargin{:});
 end

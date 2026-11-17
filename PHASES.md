@@ -4,14 +4,14 @@ Each phase ends with something that runs in MATLAB and a row in the
 results table. The paper compares every layer's classical (course)
 version with a learned one.
 
-## Phase 1 — Data and simulator  ✅ this commit
+## Phase 1 — Data and simulator  ✅ done
 - Leak-free train/val/test split from raw ETH/UCY; static windows flagged
 - Crowd replay with interpolation between 0.4 s frames
 - Differential-drive robot, occupancy/cost grid, A*, pure pursuit, speed governor
 - Metrics: success, collisions, min clearance, time, path ratio, freezing, personal-space intrusions
 - `demo_phase1` animation + MP4; `exp_phase1_baseline` over 6 scenes × 20 episodes
 
-## Phase 2 — Tracking and classical predictors
+## Phase 2 — Tracking and classical predictors  ✅ done
 - Kalman filter (constant-velocity model) to estimate velocity from noisy positions
 - Predictors: constant velocity, Kalman rollout, Social Force
 - ADE/FDE on the clean val and ETH test sets

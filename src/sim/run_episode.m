@@ -6,8 +6,9 @@ function [log, m] = run_episode(S, task, cfg)
 %   Loop (every cfg.dt):
 %     1. read the crowd at time t from the recording (scene_peds_at)
 %     2. every cfg.replanEvery s: turn people into obstacles (by default
-%        their current positions; Phase 2+ plugs predictions in through
-%        cfg.obstacleFcn), build the cost map, run A*
+%        their current positions; with cfg.obstacleFcn =
+%        make_obstacle_fcn('kalman') etc. their predicted paths too),
+%        build the cost map, run A*
 %     3. pure pursuit on the A* path gives (v, w); a speed governor
 %        scales v down as the nearest person gets close
 %     4. integrate the differential-drive model
@@ -29,6 +30,8 @@ log.ids = cell(nSteps, 1);
 log.P = cell(nSteps, 1);
 log.path = cell(nSteps, 1);
 log.planMs = [];
+log.pred = cell(nSteps, 1);
+lastPred = [];
 reached = false;
 for k = 1:nSteps
     t = task.t0 + (k - 1) * cfg.dt;
@@ -44,7 +47,8 @@ for k = 1:nSteps
             C = P;
             r = repmat(cfg.pedR + cfg.robotR + cfg.margin, size(P, 1), 1);
         else
-            [C, r] = cfg.obstacleFcn(S, t, ids, P, V, cfg);
+            [C, r, viz] = cfg.obstacleFcn(S, t, ids, P, V, cfg, x);
+            lastPred = viz;
         end
         [blocked, cost] = grid_costmap(G, C, r, cfg.socialR);
         tic;
@@ -67,7 +71,7 @@ for k = 1:nSteps
 
     log.t(k) = t; log.x(k, :) = x; log.u(k, :) = [v w];
     log.clear(k) = clr; log.nPeds(k) = numel(ids);
-    log.ids{k} = ids; log.P{k} = P; log.path{k} = path;
+    log.ids{k} = ids; log.P{k} = P; log.path{k} = path; log.pred{k} = lastPred;
 
     if dGoal < cfg.goalTol
         reached = true;

@@ -11,8 +11,9 @@ comfortable distance. Course project for EGN3113, built in phases (see
 ```matlab
 cd crowd-nav-matlab
 startup            % adds src/ folders to the path
-run_tests          % 6 quick checks, < 30 s
-demo_phase1        % clean data, run the robot, animate, save MP4
+run_tests          % quick checks, < 30 s
+demo_phase1        % clean data, run the robot, animate, save video
+demo_phase2        % same crowd without vs with Kalman prediction
 ```
 
 Phase 1 needs **no toolboxes**. Later phases use the Deep Learning
@@ -25,8 +26,9 @@ optionally Model Predictive Control Toolbox (nlmpc).
 |---|---|
 | `data/raw/` | The 6 ETH/UCY files: frame, ped_id, x, y (m), 2.5 Hz |
 | `src/data/` | Loading, windowing (8 observed + 12 future steps) and the leak-free split |
+| `src/predict/` | Constant velocity, Kalman filter, Social Force, ADE/FDE evaluation |
 | `src/sim/` | Crowd replay, diff-drive robot, cost map, A*, pure pursuit, metrics, animation |
-| `demos/` | `demo_phase1.m` (more demos per phase) |
+| `demos/` | One demo per phase |
 | `experiments/` | Batch runs that produce the numbers for the report |
 | `tests/` | `run_tests.m` |
 | `results/` | Generated videos, CSVs and .mat files (not committed) |
@@ -84,3 +86,51 @@ university scenes it freezes about 40% of the time. Because the crowd
 is replayed, people never step aside, so the robot can only avoid them
 by knowing where they are heading. That is the gap the predictors in
 Phases 2 to 4 are meant to close.
+
+## Phase 2: tracking and classical predictors
+
+`src/predict/` has three predictors behind one interface,
+`Y = fn(H, 12, 0.4)` (H = everyone's last 8 positions):
+
+- **cv**: constant velocity from the last step.
+- **kalman**: a constant-velocity Kalman filter (`kalman_cv.m`) smooths the
+  noisy track and rolls forward; it also gives a covariance for Phase 4.
+- **sf**: Social Force (Helbing & Molnar 1995). Everyone is simulated
+  together, keeping their filtered velocity and pushing away from people ahead of them.
+
+Kalman noise q and the Social Force strength A and range B were tuned on
+**val only** (`tune_phase2`).
+
+**Prediction accuracy** (`exp_phase2_prediction`, metres, ADE / FDE):
+
+| | val | val, moving only | ETH test |
+|---|---|---|---|
+| cv | 0.440 / 0.972 | 0.562 / 1.245 | 1.075 / 2.282 |
+| kalman | 0.443 / 0.977 | 0.565 / 1.250 | 1.071 / 2.277 |
+| sf | 0.461 / 0.993 | 0.569 / 1.240 | 1.056 / 2.238 |
+
+All three come out within about 5% of each other. Constant velocity is
+a famously strong baseline on ETH/UCY (Schöller et al. 2020 report about
+the same ETH numbers). The learned models in Phase 3 have to beat these numbers.
+
+**Using predictions in the planner.** `make_obstacle_fcn('kalman')` turns
+predictions into obstacles. A predicted position τ seconds ahead
+becomes a hard obstacle only where the robot could actually meet the person
+(|distance − v_max·τ| < 1 m); elsewhere it adds a soft cost. Predictions up
+to 3.2 s ahead are used.
+
+**Navigation** (`exp_navigation(name)`: the same 120 episodes as Phase 1 for every predictor):
+
+| Predictor | Success | Reached | Collisions / ep | Min clearance (m) | Time (s) | Stopped | Personal-space intrusion (s) | Plan (ms) |
+|---|---|---|---|---|---|---|---|---|
+| none (Phase 1) | 18% | 89% | 3.38 | -0.31 | 23.2 | 20% | 10.2 | 65 |
+| cv | 33% | 91% | 2.08 | -0.08 | 24.2 | 15% | 6.5 | 72 |
+| kalman | 33% | 90% | 2.27 | -0.08 | 24.4 | 15% | 6.7 | 71 |
+| sf | 34% | 91% | 2.05 | -0.05 | 23.9 | 14% | 6.2 | 72 |
+
+Adding any prediction nearly doubles success and cuts collisions by about
+a third, at about the same travel time. The three predictors are close
+to each other, so in this setting knowing *that* people move matters
+more than predicting *exactly how*. Zara1 reaches 80% success, while the dense
+university scenes (students001/003) stay at 0–10%. They are the hard case for
+the later phases.
