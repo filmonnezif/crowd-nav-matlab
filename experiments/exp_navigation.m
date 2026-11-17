@@ -25,7 +25,8 @@ for f = 1:numel(files)
             [~, m] = run_episode(S, scene_task(S, t0, flip), cfg);
             rows(end + 1, :) = {[predName '+' controller], m.scene, m.t0, flip, m.reached, ...
                 m.success, m.collisions, m.minClear, m.timeToGoal, ...
-                m.pathRatio, m.freezeFrac, m.intrusions, m.meanPlanMs}; %#ok<AGROW>
+                m.pathRatio, m.freezeFrac, m.intrusions, m.meanPlanMs, ...
+                m.faultCollisions, m.successNoFault}; %#ok<AGROW>
         end
     end
     fprintf('%s: %s done\n', predName, S.name);
@@ -33,13 +34,13 @@ end
 d = fileparts(outFile);
 if ~isempty(d) && ~exist(d, 'dir'), mkdir(d); end
 fid = fopen(outFile, 'w');
-fprintf(fid, 'predictor,scene,t0,flip,reached,success,collisions,minClear,timeToGoal,pathRatio,freezeFrac,intrusions,planMs\n');
+fprintf(fid, 'predictor,scene,t0,flip,reached,success,collisions,minClear,timeToGoal,pathRatio,freezeFrac,intrusions,planMs,faultCollisions,successNoFault\n');
 for r = 1:size(rows, 1)
-    fprintf(fid, '%s,%s,%.1f,%d,%d,%d,%d,%.3f,%.2f,%.3f,%.3f,%.1f,%.1f\n', rows{r, :});
+    fprintf(fid, '%s,%s,%.1f,%d,%d,%d,%d,%.3f,%.2f,%.3f,%.3f,%.1f,%.1f,%d,%d\n', rows{r, :});
 end
 fclose(fid);
 T = rows;
-fprintf('%s: success %.0f%%, collisions/ep %.2f, reached %.0f%%\n', predName, ...
-    100 * mean(cell2mat(rows(:, 6))), mean(cell2mat(rows(:, 7))), ...
-    100 * mean(cell2mat(rows(:, 5))));
+fprintf('%s+%s: success %.0f%%, collisions/ep %.2f, at-fault/ep %.2f, success (no at-fault) %.0f%%, reached %.0f%%\n', ...
+    predName, controller, 100 * mean(cell2mat(rows(:, 6))), mean(cell2mat(rows(:, 7))), ...
+    mean(cell2mat(rows(:, 14))), 100 * mean(cell2mat(rows(:, 15))), 100 * mean(cell2mat(rows(:, 5))));
 end
