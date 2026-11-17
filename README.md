@@ -332,3 +332,92 @@ circles. In that scene the margins make things worse (3 contacts and 53 s
 instead of 0 contacts and 33 s): the 90% circles for fast walkers cover
 most of the corridor, so the robot detours and gets caught. This is the
 coverage-versus-room trade-off from the tables, in one picture.
+
+## Phase 5: a crowd that reacts, and planning in space-time
+
+### Reactive crowd (`src/crowd/`, `cfg.crowd = 'reactive'`)
+
+In the replayed crowd nobody ever yields, so many contacts were people
+walking into a robot that had stopped. In the reactive crowd every person
+is simulated with **Social Force** (Helbing & Molnár 1995):
+
+* they still follow their own recorded route: each moment they head for
+  where the recording has them 1.2 s later, so the scene stays the real one;
+* they are pushed away from the robot and from each other, more by what is
+  in front of them than behind, and they side-step to the right instead of
+  only braking (pure head-on repulsion is a known Social Force dead end);
+* the predictors observe this simulated crowd, not the recording.
+
+With no robot, the simulated crowd stays on average 0.21 m from the
+recording. A new metric, **people pushed (m)**, is how far the robot moved
+people from where they would have walked without it (same simulated crowd,
+no robot), summed over people and averaged over time.
+
+### Space-time A* (`st_plan.m`, `cfg.planner = 'sta'`)
+
+The grid (0.3 m) is copied for every 0.4 s step over the next 4.8 s. From
+each cell the robot can **wait** or move to a neighbour, which always takes
+one step. A cell is blocked at a step if a person is *predicted* to be
+there at that time (plus their Phase 4 uncertainty radius, if enabled).
+Every move goes forward in time, so the graph has no cycles and the best
+plan is found exactly by dynamic programming backwards from the last
+layer, vectorised over the grid (about 20 ms, against about 80 ms for the
+2-D A*). The plan is followed **in time**: when it says wait, the target
+stops. 2-D A* can only route around where people are now, plus the
+"meeting point" trick from Phase 2.
+
+### Sampling MPC (`mpc_control.m`, `cfg.controller = 'mpc'`)
+
+The cross-entropy method optimises 8 commands of 0.4 s (3.2 s ahead):
+120 sampled command sequences, 3 rounds, keeping the best 10% each round,
+warm-started from the last solution. The cost is tracking the plan's
+reference in time, clearance to predicted people, and smoothness. Unlike
+DWA's single constant (v, w) arc, the speed and turn can change over the
+horizon (slow down now, speed up later). Octave-friendly; `nlmpc` from the
+MPC Toolbox could replace it in MATLAB.
+
+### Results (constant-velocity prediction, same 120 episodes)
+
+| Crowd | Planner | Controller | Success | Reached | Contacts / ep | At-fault / ep | Univ. success / contacts | People pushed (m) | Plan (ms) |
+|---|---|---|---|---|---|---|---|---|---|
+| replay | A* | pure pursuit | 33% | 91% | 2.08 | 0.00 | 2% / 4.3 | - | 62 |
+| replay | A* | DWA | 48% | 90% | 1.06 | 0.33 | 22% / 1.7 | - | 62 |
+| replay | space-time A* | DWA | 46% | 92% | 1.03 | 0.29 | 22% / 1.4 | - | 20 |
+| replay | A* | MPC | 45% | 90% | 1.04 | 0.56 | 12% / 1.9 | - | 89 |
+| replay | space-time A* | MPC | 48% | 92% | 0.92 | 0.45 | 28% / 1.2 | - | 20 |
+| reactive | A* (no prediction) | DWA | 41% | 91% | 1.23 | 0.18 | 20% / 1.8 | 0.47 | 61 |
+| reactive | A* | pure pursuit | 48% | 88% | 1.47 | 0.00 | 15% / 3.0 | 0.42 | 81 |
+| reactive | A* | DWA | 50% | 92% | 0.87 | 0.45 | 20% / 1.4 | 0.24 | 79 |
+| reactive | A* | MPC | 52% | 91% | 0.93 | 0.47 | 25% / 1.6 | 0.24 | 74 |
+| reactive | space-time A* | DWA | 53% | 92% | 0.79 | 0.39 | 32% / 1.2 | 0.26 | 16 |
+| reactive | space-time A* | MPC | 52% | 92% | **0.67** | 0.46 | 28% / **0.8** | **0.23** | 21 |
+| reactive | space-time A* + 90% conformal | DWA | 36% | 60% | 0.62 | 0.33 | 2% / 0.8 | 0.09 | 16 |
+| reactive | space-time A* + 90% conformal | MPC | 35% | 55% | 0.76 | 0.46 | 0% / 1.2 | 0.10 | 16 |
+
+With 120 episodes a success rate has a standard error of about 4.5
+points, so differences of a few points are noise. What holds up:
+
+1. **The replayed crowd made the robot look worse than it is.** With people
+   who react, pure pursuit goes from 33% to 48% success: most of its
+   contacts were people walking into a stopped robot. A stopped robot is
+   still a nuisance, though: it pushes people the most (0.42 m).
+2. **Planning in space-time + MPC gives the fewest contacts.** In the
+   reactive crowd, space-time A* + MPC has 0.67 contacts per episode
+   against 0.87 for 2-D A* + DWA (−23%), 0.8 instead of 1.4 in the dense
+   university scenes, and disturbs people least. It also plans 4× faster.
+3. **Prediction matters more once people react.** Without prediction the
+   robot pushes people twice as far (0.47 vs 0.24 m) and touches them more
+   (1.23 vs 0.87 per episode).
+4. **Full 90% uncertainty margins freeze the robot.** With Phase 4's
+   conformal circles in the space-time plan, the robot barely disturbs
+   anyone (0.09 m) but only reaches the goal 55–60% of the time, and
+   almost never in the dense university scenes. This is the "freezing
+   robot problem" (Trautman & Krause 2010): when every future is
+   possible, every path looks blocked. The circles from Phase 4 are too
+   big to plan inside; smaller or risk-weighted margins are future work.
+5. **At-fault contacts stay around 0.4–0.5 per episode** for every robot
+   that keeps moving: mostly the robot squeezing past someone who
+   changed direction.
+
+`demo_phase5` runs 2-D A* + DWA and space-time A* + MPC through the
+busiest 30 s of the university scene with the reactive crowd.

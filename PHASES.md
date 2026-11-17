@@ -31,10 +31,10 @@ version with a learned one.
 - Adaptive conformal (ACI) for distribution shift; Kalman covariance vs conformal
 - `demo_phase4` draws the uncertainty rings
 
-## Phase 5 — Better planning and a reactive crowd
-- Space-time A* over predicted positions (time as the third axis)
-- Nonlinear MPC (nlmpc) that can slow down or swerve
-- Reactive Social Force crowd so people respond to the robot
+## Phase 5 — Better planning and a reactive crowd  ✅ done
+- Space-time A* over predicted positions (time as the third axis), exact DP over the time-layered grid
+- Sampling MPC (cross-entropy method) that can slow down or swerve; nlmpc optional in MATLAB
+- Reactive Social Force crowd so people respond to the robot, plus a "people pushed" metric
 
 ## Phase 6 — Demo
 - One animated scene: predictions, uncertainty circles, robot plan
