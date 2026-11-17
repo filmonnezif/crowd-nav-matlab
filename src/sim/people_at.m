@@ -14,18 +14,13 @@ tk = pred.tObs + (0:size(pred.Y, 2)) * dtp - tNow;      % times of knots, relati
 X = [pred.P0(:, 1), pred.Y(:, :, 1)];
 Yv = [pred.P0(:, 2), pred.Y(:, :, 2)];
 tau = min(max(tau(:)', tk(1)), tk(end));
-Q = zeros(size(X, 1), numel(tau), 2);
-Q(:, :, 1) = interp1(tk, X', tau)';
-Q(:, :, 2) = interp1(tk, Yv', tau)';
-if numel(tau) == 1                                       % interp1 orientation
-    Q = reshape(Q, [], 1, 2);
-end
+n = size(X, 1); m = numel(tau);
+% interpolate each person's knots column-wise (interp1 on a matrix works
+% per column: knots are rows of X', people are columns)
+Q = zeros(n, m, 2);
+Q(:, :, 1) = reshape(interp1(tk(:), X', tau(:)), m, n)';
+Q(:, :, 2) = reshape(interp1(tk(:), Yv', tau(:)), m, n)';
 % uncertainty radius (0 at the last observation, conformal after that)
-Rk = [zeros(size(X, 1), 1), pred.R];
-if size(X, 1) == 1
-    Rad = interp1(tk, Rk', tau);
-else
-    Rad = interp1(tk, Rk', tau)';
-end
-Rad = reshape(Rad, size(X, 1), numel(tau));
+Rk = [zeros(n, 1), pred.R];
+Rad = reshape(interp1(tk(:), Rk', tau(:)), m, n)';
 end

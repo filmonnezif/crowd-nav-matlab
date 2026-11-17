@@ -55,6 +55,7 @@ cfg = struct( ...
     'crowdBr',     0.35, ... % reactive crowd: robot repulsion range (m)
     'crowdAp',     1.5,  ... % reactive crowd: person-person repulsion strength (m/s^2)
     'crowdBp',     0.25, ... % reactive crowd: person-person repulsion range (m)
+    'crowdSide',   0.6,  ... % reactive crowd: sideways (pass-on-the-right) share of the robot push
     'crowdLambda', 0.35, ... % reactive crowd: weight of things behind a person (1 = all around)
     'crowdVmax',   2.0,  ... % reactive crowd: top walking speed (m/s)
     'seed',        1,    ... % random seed (MPC sampling)

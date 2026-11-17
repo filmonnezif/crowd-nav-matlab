@@ -46,6 +46,9 @@ if n > 0 && isfinite(dtS) && dtS > 0
     w = fov_weight(E, -N, cfg.crowdLambda);
     mag = cfg.crowdAr * exp((cfg.robotR + cfg.pedR - d) / cfg.crowdBr) .* w;
     F = F + mag .* N;
+    % Pure head-on repulsion can only slow a person down (a known Social
+    % Force dead end). People actually side-step, here to their right.
+    F = F + cfg.crowdSide * mag .* [E(:, 2), -E(:, 1)];
     % other people
     if n > 1
         DX = P(:, 1) - P(:, 1)';

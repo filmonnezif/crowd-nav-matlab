@@ -56,3 +56,26 @@ assert(max(abs(Yk(:) - Y(:))) < 0.1);           % noise-free line: Kalman ~ CV
 Ys = predict_social_force(H, 12, 0.4);
 assert(all(isfinite(Ys(:))) && isequal(size(Ys), [2 12 2]));
 fprintf('Phase 2 predictor tests passed.\n');
+
+% Phase 5: space-time A* waits for a person crossing in front
+cfg = sim_config('planner', 'sta');
+pred.ids = 1; pred.tObs = 0; pred.P0 = [2 -1.5];
+pred.Y = cat(3, 2 * ones(1, 12), -1.5 + (1:12) * 0.4);  % walks up through x = 2 at 1 m/s
+pred.R = zeros(1, 12);
+[path, info] = st_plan([0 0 0], [4 0], pred, pred.P0, 0, [-1 5 -3 3], cfg);
+assert(size(path, 2) == 3 && path(end, 3) > path(1, 3));
+d = min(hypot(interp1(path(1:end - 1, 3), path(1:end - 1, 1), 0:0.4:4.4) - 2, ...
+              interp1(path(1:end - 1, 3), path(1:end - 1, 2), 0:0.4:4.4) - (-1.5 + (0:0.4:4.4))));
+assert(info.feasible && d > cfg.robotR + cfg.pedR);   % plan never touches the person
+% reactive crowd: a person walking at the robot steps aside
+S.name = 'toy'; S.dt = 0.4; S.id = ones(31, 1); S.k = (1:31)';
+S.xy = [linspace(6, -6, 31)', zeros(31, 1)]; S.nK = 31;
+S.rowsByK = num2cell((1:31)');
+cfg = sim_config('crowd', 'reactive');
+cr = crowd_init(S, cfg); dmin = inf;
+for t = 0:0.1:11.6
+    [cr, ~, P] = crowd_step(cr, t, [0 0 0], [0 0], cfg);
+    dmin = min(dmin, hypot(P(1), P(2)));
+end
+assert(dmin > cfg.robotR + cfg.pedR);                  % never walked into the parked robot
+fprintf('Phase 5 planner and crowd tests passed.\n');
