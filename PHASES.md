@@ -24,10 +24,12 @@ version with a learned one.
 - Small transformer (if time allows)
 - Same ADE/FDE table and the same navigation experiment
 
-## Phase 4 — Uncertainty
+## Phase 4 — Uncertainty  ✅ done
 - Gaussian process regression baseline
 - Split conformal prediction around every predictor: a per-horizon radius with a coverage guarantee
 - Planner inflates each predicted position by its conformal radius
+- Adaptive conformal (ACI) for distribution shift; Kalman covariance vs conformal
+- `demo_phase4` draws the uncertainty rings
 
 ## Phase 5 — Better planning and a reactive crowd
 - Space-time A* over predicted positions (time as the third axis)

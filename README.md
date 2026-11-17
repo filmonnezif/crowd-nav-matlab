@@ -234,3 +234,86 @@ Learned-predictor runs need the trained models, so run them in MATLAB:
 `exp_phase3_navigation`. Learned predictors fall back to constant velocity
 for people seen for fewer than 8 frames, because the networks were never
 trained on padded histories.
+
+## Phase 4: how wrong can a prediction be?
+
+Code in `src/uncertainty/`. Every predictor gets a circle around each
+predicted position that should contain the true position 90% of the time.
+
+### Methods
+
+* **Split conformal prediction** (`conformal_calibrate`, `get_conformal`).
+  Take the prediction errors on the validation set. For each horizon, the
+  radius is the ⌈(n+1)(1−α)⌉-th smallest error. If test data looks like
+  validation data, this radius has a guaranteed 1−α coverage, whatever the
+  predictor (CV, Kalman, LSTM, CNN...). Two variants:
+  `plain` (one radius per horizon) and `speed` (radius grows with the
+  person's speed: r = (0.5 + speed)·q).
+* **Adaptive conformal inference (ACI)** (`aci_offline`). Runs through the
+  test scene in time order. Each time an outcome becomes known and the
+  circle missed, the level is lowered so circles grow; each hit lets them
+  shrink. Coverage then tracks 90% even when the test scene differs.
+* **Model-based uncertainty.** The Kalman filter's own covariance, and a
+  **Gaussian process** predictor (`train_gp`, `predict_gp`, 24 ARD GPs on
+  1000 training windows) that gives a predictive standard deviation. A 90%
+  circle is 2.146·σ.
+
+### Do the circles contain the truth? (`exp_phase4_uncertainty`, α = 0.1)
+
+Coverage on the ETH test scene (never seen in training or calibration),
+mean radius in metres at 1.6 / 3.2 / 4.8 s ahead. Validation coverage of
+the conformal methods is 90.0% by construction.
+
+| Predictor | Method | ETH coverage | Radius 1.6 / 3.2 / 4.8 s |
+|---|---|---|---|
+| cv | conformal plain | 57% | 0.48 / 1.25 / 2.18 |
+| cv | conformal speed | 64% | 0.65 / 1.74 / 3.03 |
+| cv | ACI plain | 90% | 2.39 / 6.04 / 11.9 |
+| cv | ACI speed | 91% | 3.65 / 9.25 / 13.9 |
+| kalman | conformal speed | 64% | 0.65 / 1.75 / 3.04 |
+| kalman | Kalman covariance | 98% | 1.84 / 4.85 / 8.69 |
+| sf | conformal speed | 65% | 0.68 / 1.76 / 3.06 |
+GP_ROWS
+
+What this shows:
+
+1. **The 90% guarantee breaks under distribution shift.** People in ETH walk
+   about twice as fast as in the validation scenes (median 1.01 vs
+   0.51 m/s), and validation has many people standing still. So radii
+   calibrated on validation cover only 57–65% on ETH. Scaling the radius
+   with speed helps (57% → 64%) but does not close the gap.
+2. **ACI gets the coverage back but the circles become huge.** ETH errors
+   are heavy-tailed, so 90% coverage needs radii of several metres. With a
+   smaller step size (γ = 0.003) ACI gives 85% coverage with 1.6 m at 1.6 s.
+   There is a real trade-off between coverage and how much room the robot
+   has left.
+3. **Model-based uncertainty is over-cautious.** The Kalman covariance
+   covers 98% with circles 3–4 times bigger than conformal ones.
+
+### Does uncertainty make the robot safer? (DWA, 120 episodes)
+
+`make_obstacle_fcn('cv', struct('alpha', 0.1, 'cpMode', 'speed'))`
+inflates every predicted person by its conformal radius, both in the A*
+cost map and in DWA's clearance check.
+
+| Predictor | Uncertainty | Success | Reached | Collisions / ep | At-fault / ep | Median min clearance (m) |
+|---|---|---|---|---|---|---|
+| cv | none | 47% | 90% | 1.06 | 0.33 | -0.02 |
+| cv | conformal 90% plain | 44% | 76% | 0.88 | 0.38 | 0.04 |
+| cv | conformal 90% speed | 47% | 80% | 0.86 | 0.42 | 0.04 |
+| kalman | none | 47% | 93% | 0.98 | 0.32 | -0.02 |
+| kalman | conformal 90% speed | 49% | 76% | 0.82 | 0.41 | 0.06 |
+| kalman | conformal 70% speed | 48% | 81% | 0.97 | 0.39 | 0.06 |
+
+Conformal margins cut contacts by about 15–20% (1.06 → 0.86 per episode)
+and keep the robot further from people. But the larger circles block more
+of the space, so the robot reaches the goal less often within the time
+limit (90% → 76–80%), and overall success stays about the same. The extra
+at-fault contacts come from the robot squeezing between inflated circles.
+Phase 5 (space-time A*, MPC and a crowd that reacts) is where these
+margins should pay off, because a planner that reasons over time can wait
+or detour instead of getting boxed in.
+
+`demo_phase4` shows CV + DWA with and without conformal margins on the
+busiest part of ETH. The orange rings are the 1.6 / 3.2 / 4.8 s conformal
+circles.
