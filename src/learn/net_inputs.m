@@ -9,7 +9,7 @@ switch lower(name)
     case {'lstm', 'tf'}
         seq = cell(n, 1);
         for i = 1:n
-            seq{i} = single(reshape(F.motion(i, :, :), [], 2)');  % 2 x 7 (C x T)
+            seq{i} = single(reshape(F.motion(i, :, :), [], 2));   % 7 x 2 (time x channels)
         end
         X = {seq};
     case 'tcn'
