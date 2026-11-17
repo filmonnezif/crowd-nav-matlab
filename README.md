@@ -14,6 +14,8 @@ startup            % adds src/ folders to the path
 run_tests          % quick checks, < 30 s
 demo_phase1        % clean data, run the robot, animate, save video
 demo_phase2        % same crowd without vs with Kalman prediction
+train_predictors   % train the 5 networks (Deep Learning Toolbox, ~30 min)
+demo_phase3        % LSTM + DWA vs Kalman + pure pursuit in a dense crowd
 ```
 
 Phase 1 needs **no toolboxes**. Later phases use the Deep Learning
@@ -26,6 +28,7 @@ optionally Model Predictive Control Toolbox (nlmpc).
 |---|---|
 | `data/raw/` | The 6 ETH/UCY files: frame, ped_id, x, y (m), 2.5 Hz |
 | `src/data/` | Loading, windowing (8 observed + 12 future steps) and the leak-free split |
+| `src/learn/` | Features, network definitions, learned predictor wrapper |
 | `src/predict/` | Constant velocity, Kalman filter, Social Force, ADE/FDE evaluation |
 | `src/sim/` | Crowd replay, diff-drive robot, cost map, A*, pure pursuit, metrics, animation |
 | `demos/` | One demo per phase |
@@ -134,3 +137,100 @@ to each other, so in this setting knowing *that* people move matters
 more than predicting *exactly how*. Zara1 reaches 80% success, while the dense
 university scenes (students001/003) stay at 0–10%. They are the hard case for
 the later phases.
+
+## Phase 3: learned predictors and a smarter controller
+
+### Networks (`src/learn/`, trained with `train_predictors` in MATLAB)
+
+Every network sees a person's last 8 positions in their own **heading
+frame** (origin at the person, x axis along their walking direction) and
+outputs a **correction to constant velocity** for the next 12 steps
+(residual learning). Training uses the clean train split plus
+left/right mirrored copies (56,044 samples). Early stopping keeps the
+best validation epoch.
+
+| Network | What it looks at | Learnable params |
+|---|---|---|
+| `mlp` | the 7 step displacements, flattened | 38,040 |
+| `lstm` | the 7 steps as a sequence (LSTM, 64 units) | 28,568 |
+| `tcn` | temporal CNN: 1-D convolutions over the 7 steps | 62,968 |
+| `sgcnn` | **social-grid CNN**: a 2-D CNN on a 16×16 grid (0.5 m cells) of neighbours' positions and velocities around the person, joined with their own motion | 58,488 |
+| `tf` | small transformer: self-attention over the 7 steps | 45,528 |
+
+`show_architectures` draws each network to `results/arch_*.png`;
+`deepNetworkDesigner(predictor_net('sgcnn'))` opens one in Deep Network
+Designer.
+
+**Prediction accuracy** (ADE / FDE in metres; ETH is never seen in training):
+
+| | val | val, moving only | ETH test |
+|---|---|---|---|
+| cv | 0.440 / 0.972 | 0.562 / 1.245 | 1.075 / 2.282 |
+| kalman | 0.443 / 0.977 | 0.565 / 1.250 | 1.071 / 2.277 |
+| sf | 0.461 / 0.993 | 0.569 / 1.240 | 1.056 / 2.238 |
+| mlp | 0.431 / 0.938 | 0.541 / 1.181 | 1.030 / 2.091 |
+| **lstm** | 0.440 / 0.958 | 0.548 / 1.196 | **1.003 / 2.045** |
+| tcn | 0.430 / 0.936 | 0.541 / 1.180 | 1.021 / 2.058 |
+| **sgcnn** | **0.429 / 0.934** | **0.529 / 1.158** | 1.044 / 2.155 |
+| tf | 0.433 / 0.944 | 0.543 / 1.186 | 1.008 / 2.044 |
+
+Every network beats every classical predictor. The FDE gain is about
+10% on ETH. The social-grid CNN is best on the scenes it was trained on
+(it uses the neighbours), while the LSTM and transformer transfer best
+to the unseen ETH scene.
+
+### DWA local controller (`dwa_control.m`, `cfg.controller = 'dwa'`)
+
+Pure pursuit with a speed governor can only slow down, so it stops in
+people's way. The Dynamic Window Approach tries 77 (v, w) commands,
+including slow reversing, within the acceleration limits. It rolls each
+one out for 2 s and checks it against where people are **predicted** to be
+at each moment. It picks the command with the best progress, clearance,
+speed and smoothness that keeps clear of everyone.
+
+### Navigation (same 120 episodes as before)
+
+A contact is **at fault** when the robot was moving toward the person at the
+moment of contact (closing speed > 0.1 m/s). Otherwise the person walked
+into it, which the replayed crowd does because it never yields.
+
+| Predictor | Controller | Success | Reached | Collisions / ep | At-fault / ep | Min clearance (m) | Time (s) | Stopped | Univ. success / coll. |
+|---|---|---|---|---|---|---|---|---|---|
+| none | pp | 18% | 89% | 3.38 | 0.00 | -0.31 | 23.2 | 20% | 2% / 6.8 |
+| none | dwa | 23% | 94% | 2.35 | 0.24 | -0.21 | 24.5 | 1% | 5% / 4.1 |
+| cv | pp | 33% | 91% | 2.08 | 0.00 | -0.08 | 24.2 | 15% | 2% / 4.3 |
+| cv | dwa | 48% | 90% | 1.06 | 0.33 | 0.01 | 24.1 | 1% | 22% / 1.7 |
+| kalman | pp | 33% | 90% | 2.27 | 0.00 | -0.08 | 24.4 | 15% | 2% / 4.8 |
+| kalman | dwa | 47% | 92% | 0.98 | 0.32 | 0.01 | 24.6 | 1% | 20% / 1.6 |
+| sf | pp | 34% | 91% | 2.05 | 0.00 | -0.05 | 23.9 | 14% | 5% / 4.2 |
+| sf | dwa | 47% | 90% | 1.00 | 0.29 | 0.02 | 23.9 | 1% | 20% / 1.6 |
+| tcn | pp | 33% | 92% | 2.12 | 0.00 | -0.08 | 24.5 | 14% | 5% / 4.5 |
+| lstm | pp | 35% | 92% | 2.41 | 0.00 | -0.09 | 24.7 | 15% | 5% / 5.2 |
+| mlp | dwa | 48% | 90% | 1.04 | 0.33 | 0.01 | 24.0 | 1% | 18% / 1.8 |
+| lstm | dwa | 47% | 93% | 0.99 | 0.30 | 0.01 | 24.5 | 1% | 20% / 1.6 |
+| tcn | dwa | 44% | 92% | 1.11 | 0.34 | 0.00 | 23.9 | 1% | 15% / 1.9 |
+| sgcnn | dwa | 43% | 89% | 1.10 | 0.31 | 0.00 | 23.6 | 1% | 10% / 1.9 |
+| tf | dwa | 45% | 93% | 1.03 | 0.32 | 0.01 | 25.0 | 1% | 20% / 1.7 |
+
+What this shows:
+
+1. **The controller matters more than the predictor.** With any predictor,
+   DWA instead of pure pursuit roughly halves contacts (≈2.1 → ≈1.0 per
+   episode). It lifts success from about 33% to 47%, and in the dense university
+   scenes from 2–5% to about 20%. It almost never stands still.
+2. **DWA trades waiting for moving.** Pure pursuit is never at fault (it
+   stops before touching anyone), but people walk into it. DWA keeps
+   moving, so about 0.3 contacts per episode are its own. Phase 5's reactive
+   crowd will show which behaviour real people prefer.
+3. **Better prediction accuracy does not give safer navigation here.**
+   The networks are 5–10% more accurate than constant velocity, yet
+   navigation is within noise of it. This matches Poddar et al. (2023), whose
+   MPC drove the same with constant velocity as with a deep predictor. The
+   planner only uses predictions up to 3.2 s ahead, where everyone is close
+   to constant velocity anyway. Phase 4 (uncertainty) asks whether *knowing
+   how wrong* a prediction may be helps more than making it more accurate.
+
+Learned-predictor runs need the trained models, so run them in MATLAB:
+`exp_phase3_navigation`. Learned predictors fall back to constant velocity
+for people seen for fewer than 8 frames, because the networks were never
+trained on padded histories.

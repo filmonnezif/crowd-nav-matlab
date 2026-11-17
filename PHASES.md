@@ -17,7 +17,7 @@ version with a learned one.
 - ADE/FDE on the clean val and ETH test sets
 - Plug predictions into the planner (`cfg.obstacleFcn`) and re-run the baseline experiment
 
-## Phase 3 — Learned predictors
+## Phase 3 — Learned predictors  ✅ done (+ DWA controller)
 - LSTM encoder–decoder on relative displacements
 - Temporal 1D CNN on the 8 observed velocities (course CNN)
 - Social-grid 2D CNN: occupancy grid of neighbours around each person
