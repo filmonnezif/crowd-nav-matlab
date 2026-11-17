@@ -37,7 +37,8 @@ fprintf('\n%-14s %8s %8s %10s %9s %8s\n', 'scene', 'success', 'reached', 'coll/e
 for i = 1:numel(u)
     m = strcmp(sc, u{i});
     tg = cell2mat(rows(m, 8));
+    mc = cell2mat(rows(m, 7)); mc = mc(isfinite(mc));
     fprintf('%-14s %7.0f%% %7.0f%% %10.2f %9.2f %8.1f\n', u{i}, ...
         100 * mean(cell2mat(rows(m, 5))), 100 * mean(cell2mat(rows(m, 4))), ...
-        mean(cell2mat(rows(m, 6))), mean(cell2mat(rows(m, 7))), mean(tg(~isnan(tg))));
+        mean(cell2mat(rows(m, 6))), mean(mc), mean(tg(~isnan(tg))));
 end

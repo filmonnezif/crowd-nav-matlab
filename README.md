@@ -61,3 +61,26 @@ pedestrian + robot + 0.2 m, plus a soft "personal space" cost out to
 robot as the nearest person gets within 1 m. The crowd is replayed, so
 people do not react to the robot. This reactive, no-prediction robot is
 the baseline every later phase is compared with.
+
+### Phase 1 baseline results
+
+`exp_phase1_baseline`: 20 episodes per scene (10 start times × both
+directions), 60 s limit, robot top speed 1.0 m/s. Success = reached the
+goal with no contact. Clearance is edge to edge, so negative means
+contact.
+
+| Scene | Success | Reached goal | Collisions / episode | Min clearance (m) | Time to goal (s) | Stopped |
+|---|---|---|---|---|---|---|
+| biwi_eth | 10% | 100% | 2.7 | -0.40 | 20.1 | 11% |
+| biwi_hotel | 35% | 100% | 1.4 | -0.15 | 14.8 | 12% |
+| crowds_zara01 | 30% | 100% | 1.1 | -0.14 | 17.2 | 11% |
+| crowds_zara02 | 30% | 100% | 1.4 | -0.11 | 19.2 | 11% |
+| students001 | 5% | 45% | 6.7 | -0.50 | 37.9 | 40% |
+| students003 | 0% | 90% | 6.9 | -0.52 | 39.8 | 37% |
+
+Planning only around where people are *now* almost always reaches the
+goal but touches someone in most episodes, and in the dense
+university scenes it freezes about 40% of the time. Most contacts are
+people walking into the robot's path from the side, which it could
+only avoid by knowing where they are heading. That is the gap the
+predictors in Phases 2 to 4 are meant to close.
