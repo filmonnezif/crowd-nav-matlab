@@ -80,7 +80,7 @@ contact.
 
 Planning only around where people are *now* almost always reaches the
 goal but touches someone in most episodes, and in the dense
-university scenes it freezes about 40% of the time. Most contacts are
-people walking into the robot's path from the side, which it could
-only avoid by knowing where they are heading. That is the gap the
-predictors in Phases 2 to 4 are meant to close.
+university scenes it freezes about 40% of the time. Because the crowd
+is replayed, people never step aside, so the robot can only avoid them
+by knowing where they are heading. That is the gap the predictors in
+Phases 2 to 4 are meant to close.
