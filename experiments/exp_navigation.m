@@ -1,21 +1,27 @@
-function T = exp_navigation(predName, nStarts, outFile, controller)
+function T = exp_navigation(predName, nStarts, outFile, controller, popt, tag)
 %EXP_NAVIGATION  Same episodes for any predictor -> one CSV row each.
 %   exp_navigation('kalman')            % 10 start times x 2 directions x 6 scenes
 %   exp_navigation('none', 5, 'results/nav_none.csv')
 %   exp_navigation('kalman', 10, '', 'dwa')   % DWA local controller
+%   exp_navigation('kalman', 10, '', 'dwa', struct('alpha', 0.1, 'cpMode', 'speed'), 'cp10s')
+%                                               % + 90% conformal circles (Phase 4)
 %   Start times are spread evenly over each recording, so every
 %   predictor faces exactly the same crowds.
 if nargin < 2, nStarts = 10; end
 here = fileparts(mfilename('fullpath'));
 root = fullfile(here, '..');
 if nargin < 4, controller = 'pp'; end
+if nargin < 5, popt = struct(); end
+if nargin < 6, tag = ''; end
+label = [predName '+' controller];
+if ~isempty(tag), label = [label '+' tag]; end
 if nargin < 3 || isempty(outFile)
-    outFile = fullfile(root, 'results', ['nav_' predName '_' controller '.csv']);
+    outFile = fullfile(root, 'results', ['nav_' strrep(label, '+', '_') '.csv']);
 end
 run(fullfile(root, 'startup.m'));
 files = dir(fullfile(root, 'data', 'raw', '*.txt'));
 cfg = sim_config('controller', controller);
-cfg.obstacleFcn = make_obstacle_fcn(predName);
+cfg.obstacleFcn = make_obstacle_fcn(predName, popt);
 rows = {};
 for f = 1:numel(files)
     S = read_raw_scene(fullfile(root, 'data', 'raw', files(f).name));
@@ -23,13 +29,13 @@ for f = 1:numel(files)
     for t0 = linspace(0, Tlen - cfg.Tmax - 1, nStarts)
         for flip = [false true]
             [~, m] = run_episode(S, scene_task(S, t0, flip), cfg);
-            rows(end + 1, :) = {[predName '+' controller], m.scene, m.t0, flip, m.reached, ...
+            rows(end + 1, :) = {label, m.scene, m.t0, flip, m.reached, ...
                 m.success, m.collisions, m.minClear, m.timeToGoal, ...
                 m.pathRatio, m.freezeFrac, m.intrusions, m.meanPlanMs, ...
                 m.faultCollisions, m.successNoFault}; %#ok<AGROW>
         end
     end
-    fprintf('%s: %s done\n', predName, S.name);
+    fprintf('%s: %s done\n', label, S.name);
 end
 d = fileparts(outFile);
 if ~isempty(d) && ~exist(d, 'dir'), mkdir(d); end
@@ -40,7 +46,7 @@ for r = 1:size(rows, 1)
 end
 fclose(fid);
 T = rows;
-fprintf('%s+%s: success %.0f%%, collisions/ep %.2f, at-fault/ep %.2f, success (no at-fault) %.0f%%, reached %.0f%%\n', ...
-    predName, controller, 100 * mean(cell2mat(rows(:, 6))), mean(cell2mat(rows(:, 7))), ...
+fprintf('%s: success %.0f%%, collisions/ep %.2f, at-fault/ep %.2f, success (no at-fault) %.0f%%, reached %.0f%%\n', ...
+    label, 100 * mean(cell2mat(rows(:, 6))), mean(cell2mat(rows(:, 7))), ...
     mean(cell2mat(rows(:, 14))), 100 * mean(cell2mat(rows(:, 15))), 100 * mean(cell2mat(rows(:, 5))));
 end

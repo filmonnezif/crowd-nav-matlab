@@ -30,14 +30,14 @@ X(:, small) = x(1) + VV(small) .* tau(:) * cos(x(3));
 Y(:, small) = x(2) + VV(small) .* tau(:) * sin(x(3));
 
 % clearance to predicted people at each rollout time
-Q = people_at(pred, P, tNow, tau);         % n x nT x 2
+[Q, Rad] = people_at(pred, P, tNow, tau);  % n x nT x 2, n x nT
 minClr = inf(1, nC);
 softC = zeros(1, nC);
 if ~isempty(Q)
     for j = 1:nT
         dx = X(j, :) - Q(:, j, 1);          % n x nC
         dy = Y(j, :) - Q(:, j, 2);
-        c = min(hypot(dx, dy), [], 1) - cfg.robotR - cfg.pedR;
+        c = min(hypot(dx, dy) - Rad(:, j), [], 1) - cfg.robotR - cfg.pedR;
         minClr = min(minClr, c);
         softC = softC + max(0, cfg.dwaComfort - c) .^ 2 * (1 - 0.5 * tau(j) / Th);
     end

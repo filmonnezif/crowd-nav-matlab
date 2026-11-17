@@ -4,7 +4,7 @@ function fn = make_predictor(name, opts)
 %   at that moment), Y n x predLen x 2.
 %   Names: 'cv', 'cv2' (2-step velocity average), 'kalman', 'sf', and the
 %   trained networks 'mlp', 'lstm', 'tcn', 'sgcnn', 'tf' (models/*.mat,
-%   made by train_predictors).
+%   made by train_predictors), and 'gp' (Gaussian process, train_gp).
 if nargin < 2, opts = struct(); end
 switch lower(name)
     case 'cv'
@@ -16,6 +16,8 @@ switch lower(name)
         fn = @(H, L, dt) predict_kalman(H, L, dt, opts);
     case 'sf'
         fn = @(H, L, dt) predict_social_force(H, L, dt, opts);
+    case 'gp'
+        fn = @(H, L, dt) predict_gp(H, L, dt);
     case {'mlp', 'lstm', 'tcn', 'sgcnn', 'tf'}
         nm = lower(name);
         fn = @(H, L, dt) predict_learned(H, L, dt, nm);
