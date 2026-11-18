@@ -2,12 +2,16 @@
 %
 %   >> demo_phase5
 %
-% The busiest 30 s of the university scene, with a REACTIVE crowd:
+% A busy stretch of the university scene (episode 2, reversed, from the
+% Phase 5 experiment), with a REACTIVE crowd:
 % people follow their recorded routes but step around the robot (Social
 % Force). Two robots are compared:
 %   Phase 3 style: 2-D A* + DWA
 %   Phase 5:       space-time A* (can plan to wait) + sampling MPC
-% Both use constant-velocity prediction. The green line is the plan; for
+% Both use constant-velocity prediction. This episode was picked because
+% it shows the difference well (in Octave: 4 contacts / 43 s vs 1 / 23 s);
+% averaged over 120 episodes the gap is smaller, see README Phase 5.
+% MPC samples randomly, so MATLAB and Octave numbers differ a little. The green line is the plan; for
 % space-time A* it is where the robot intends to be over the next 4.8 s.
 here = fileparts(mfilename('fullpath'));
 run(fullfile(here, '..', 'startup.m'));
@@ -18,7 +22,8 @@ crowdMode = 'reactive';                    % or 'replay'
 saveVideo = true;
 
 S = read_raw_scene(fullfile(root, 'data', 'raw', [sceneName '.txt']));
-task = scene_task(S, scene_busy_time(S, 30));
+t0s = linspace(0, (S.nK - 1) * S.dt - 60 - 1, 10);   % the experiment's start times
+task = scene_task(S, t0s(2), true);
 if ~exist(fullfile(root, 'results'), 'dir'), mkdir(fullfile(root, 'results')); end
 for i = 1:size(runs, 1)
     cfg = sim_config('planner', runs{i, 1}, 'controller', runs{i, 2}, 'crowd', crowdMode);
