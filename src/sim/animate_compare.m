@@ -6,6 +6,8 @@ function animate_compare(logs, names, videoFile, opts)
 %   as in scene_view_init;
 %   opts.pngAt times (s) to also save a still, opts.pngFile a sprintf
 %   pattern with one %d (seconds).
+%   Writing a frame takes ~3-4 s in MATLAB Online (vs ~0.05 s on a
+%   desktop), so use opts.every there to keep the video short to make.
 %   All episodes must start at the same time. A panel whose robot has
 %   finished keeps showing its last step until the longest one ends.
 if nargin < 3, videoFile = ''; end
@@ -29,7 +31,10 @@ vw = [];
 if ~isempty(videoFile)
     [vw, videoFile] = open_video(videoFile, round(1 / cfg.dt * o.speed / o.every));
 end
-for k = 1:o.every:nk
+frames = 1:o.every:nk;
+tStart = tic;
+for j = 1:numel(frames)
+    k = frames(j);
     for i = 1:n
         scene_view_draw(H{i}, logs{i}, k);
     end
@@ -41,6 +46,11 @@ for k = 1:o.every:nk
     end
     if any(abs((k - 1) * cfg.dt - o.pngAt) < cfg.dt / 2)
         print(fig, sprintf(o.pngFile, round((k - 1) * cfg.dt)), '-dpng', '-r90');
+    end
+    if ~isempty(vw) && mod(j, 25) == 0
+        el = toc(tStart);
+        fprintf('  video frame %d / %d, about %.0f s left\n', j, numel(frames), ...
+            el / j * (numel(frames) - j));
     end
 end
 if ~isempty(vw)

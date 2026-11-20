@@ -10,6 +10,9 @@ if nargin < 3, opts = struct(); end
 o = parse_opts(struct('legend', false, 'trail', 3.2, 'label', '', 'rings', [4 8]), opts);
 cfg = log.cfg;
 try, legend(ax, 'off'); catch, end   % re-init: drop the old legend first
+% MATLAB R2025a+ follows the desktop's dark theme; the colours here are
+% chosen for a white background, so force the light figure theme.
+try, theme(ancestor(ax, 'figure'), 'light'); catch, end
 cla(ax); hold(ax, 'on'); axis(ax, 'equal');
 axis(ax, log.task.bounds); box(ax, 'on');
 xlabel(ax, 'x (m)'); ylabel(ax, 'y (m)');

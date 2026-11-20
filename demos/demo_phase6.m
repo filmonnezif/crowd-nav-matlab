@@ -38,6 +38,8 @@ showAlpha  = 0.1;           % draw 90% conformal rings; [] for none
 rings      = 4;             % ring at step 4 = 1.6 s ahead; [4 8] adds 3.2 s
 tStill     = 12;            % time (s) of the saved stills
 saveVideo  = true;
+videoEvery = 2;             % video frame every 2nd step (5 fps, real time).
+                            % MATLAB Online needs ~3-4 s per frame: ~10 min.
 openViewer = true;
 % -------------------------------------------------------------------------
 
@@ -94,7 +96,7 @@ end
 
 if saveVideo
     animate_compare(logs, predLabels, fullfile(outDir, 'phase6_compare.mp4'), ...
-        struct('rings', rings, 'pngAt', tStill, 'pngFile', fullfile(outDir, 'phase6_compare_%02ds.png')));
+        struct('rings', rings, 'every', videoEvery, 'pngAt', tStill, 'pngFile', fullfile(outDir, 'phase6_compare_%02ds.png')));
 end
 if openViewer && (~exist('OCTAVE_VERSION', 'builtin') || ~isempty(getenv('DISPLAY')))
     view_episodes(logs, predLabels, struct('rings', rings));
