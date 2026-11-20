@@ -21,6 +21,7 @@ viz.ids = zeros(0, 1);
 viz.Y = zeros(0, 12, 2);
 viz.P0 = zeros(0, 2);
 viz.R = zeros(0, 12);
+viz.Rshow = zeros(0, 12);
 viz.tObs = t;
 k = floor(t / S.dt + 1e-9) + 1;
 [hid, H] = scene_history(S, k, popt.obsLen);
@@ -31,7 +32,13 @@ viz.Y = Y;
 % Phase 4: uncertainty radius per person and horizon (conformal)
 vlast = reshape(H(:, end, :) - H(:, end - 1, :), [], 2) / S.dt;
 vlast(~isfinite(vlast)) = 0;
-viz.R = conformal_radius(popt.conformal, hypot(vlast(:, 1), vlast(:, 2)));
+spd = hypot(vlast(:, 1), vlast(:, 2));
+viz.R = conformal_radius(popt.conformal, spd);
+if isfield(popt, 'showConformal') && ~isempty(popt.showConformal)
+    viz.Rshow = conformal_radius(popt.showConformal, spd);   % drawn, not planned around
+else
+    viz.Rshow = viz.R;
+end
 viz.P0 = reshape(fill_history(H(:, end, :)), [], 2);   % positions at tObs
 viz.tObs = (k - 1) * S.dt;                             % scene time of the last frame
 tau = (k - 1) * S.dt + (1:popt.predLen) * S.dt - t;   % seconds ahead

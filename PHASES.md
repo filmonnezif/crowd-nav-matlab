@@ -36,10 +36,11 @@ version with a learned one.
 - Sampling MPC (cross-entropy method) that can slow down or swerve; nlmpc optional in MATLAB
 - Reactive Social Force crowd so people respond to the robot, plus a "people pushed" metric
 
-## Phase 6 — Demo
+## Phase 6 — Demo  ✅ done
 - One animated scene: predictions, uncertainty circles, robot plan
 - Predictor switch (CV / Kalman / LSTM / CNN) for side-by-side comparison
 - VideoWriter export for the presentation
+- `demo_phase6`: side-by-side video, stills, summary CSV and an interactive viewer (`view_episodes`)
 
 ## Phase 7 — Experiments and paper
 - Full grid: predictors × uncertainty on/off × planners × scenes

@@ -132,5 +132,6 @@ end
 log.task = task;
 log.cfg = cfg;
 log.scene = S.name;
+log.reached = reached;
 m = episode_metrics(log, reached);
 end

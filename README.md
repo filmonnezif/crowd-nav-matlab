@@ -16,6 +16,9 @@ demo_phase1        % clean data, run the robot, animate, save video
 demo_phase2        % same crowd without vs with Kalman prediction
 train_predictors   % train the 5 networks (Deep Learning Toolbox, ~30 min)
 demo_phase3        % LSTM + DWA vs Kalman + pure pursuit in a dense crowd
+demo_phase4        % conformal uncertainty rings
+demo_phase5        % reactive crowd, space-time A* + MPC
+demo_phase6        % presentation demo: every predictor side by side + viewer
 ```
 
 Phase 1 needs **no toolboxes**. Later phases use the Deep Learning
@@ -421,3 +424,38 @@ points, so differences of a few points are noise. What holds up:
 
 `demo_phase5` runs 2-D A* + DWA and space-time A* + MPC through the
 busiest 30 s of the university scene with the reactive crowd.
+
+## Phase 6: the presentation demo
+
+`demo_phase6` runs the same busy university episode as `demo_phase5`
+(reactive crowd, space-time A* + sampling MPC) once per predictor:
+constant velocity, Kalman, LSTM and the social-grid CNN. Everything the
+robot "thinks" is drawn:
+
+| On screen | Meaning |
+|---|---|
+| blue discs, grey dots | people and their last 3.2 s |
+| dashed blue lines | each person's predicted path, 4.8 s ahead |
+| orange rings | 90% conformal uncertainty 1.6 s ahead (Phase 4). Drawn only: the planner uses the bare predictions, because full 90% margins freeze the robot (Phase 5) |
+| green line | the robot's space-time plan |
+| red line / disc | the robot's path so far; the disc turns black on contact |
+
+It writes to `results/`:
+
+* `phase6_compare.mp4` (`.avi` on Linux / MATLAB Online): all predictors
+  side by side, in sync;
+* `phase6_<predictor>.png` and `phase6_compare_12s.png`: stills with a legend;
+* `phase6_summary.csv`: one row of metrics per predictor;
+
+and then opens `view_episodes`, an interactive viewer with a
+**predictor drop-down**, a time slider and Play. Switching predictor
+keeps the time, so you can stop at a moment and flip between them.
+Change the settings block at the top of the demo to use another
+scene, planner, controller, crowd or set of predictors. Learned
+predictors without a trained model are skipped, so the demo also runs
+in Octave (stills and viewer; Octave has no VideoWriter).
+
+The drawing code is shared: `scene_view_init` / `scene_view_draw` draw
+one episode view, used by `animate_episode`, `animate_compare` and
+`view_episodes`. `make_obstacle_fcn(name, struct('showAlpha', 0.1))`
+attaches display-only uncertainty radii (`log.pred{k}.Rshow`).

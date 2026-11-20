@@ -79,3 +79,28 @@ for t = 0:0.1:11.6
 end
 assert(dmin > cfg.robotR + cfg.pedR);                  % never walked into the parked robot
 fprintf('Phase 5 planner and crowd tests passed.\n');
+
+% Phase 6: display-only uncertainty rings never reach the planner
+S = read_raw_scene(fullfile(root, 'data', 'raw', 'biwi_eth.txt'));
+cfg = sim_config();
+popt = struct('horizon', 3.2, 'band', 1.0, 'obsLen', 8, 'predLen', 12, ...
+    'conformal', [], 'showConformal', struct('mode', 'plain', 'q', 0.1 * (1:12)));
+t = 20;
+[ids, P, V] = scene_peds_at(S, t);
+[C, r, viz] = pred_obstacles(S, t, ids, P, V, cfg, [0 0 0], make_predictor('cv'), popt);
+assert(~isempty(viz.Y) && all(viz.R(:) == 0) && all(abs(viz.Rshow(1, :) - 0.1 * (1:12)) < 1e-12));
+popt.showConformal = [];
+[C2, r2] = pred_obstacles(S, t, ids, P, V, cfg, [0 0 0], make_predictor('cv'), popt);
+assert(isequal(C, C2) && isequal(r, r2));             % same obstacles with or without rings
+% the view draws people, rings and the robot, and holds the last step
+cfg.Tmax = 1;
+log = run_episode(S, scene_task(S, t), cfg);
+log.pred{end} = viz;
+f = figure('Visible', 'off');
+h = scene_view_init(axes('Parent', f), log, struct('legend', true));
+scene_view_draw(h, log, numel(log.t) + 5);
+assert(any(isfinite(get(h.unc, 'XData'))) && any(isfinite(get(h.ped, 'XData'))));
+ttl = get(h.title, 'String');
+assert(~isempty(strfind([ttl{:}], 'finished')));
+close(f);
+fprintf('Phase 6 demo tests passed.\n');
