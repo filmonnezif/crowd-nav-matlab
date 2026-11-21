@@ -18,9 +18,9 @@ n = size(X, 1); m = numel(tau);
 % interpolate each person's knots column-wise (interp1 on a matrix works
 % per column: knots are rows of X', people are columns)
 Q = zeros(n, m, 2);
-Q(:, :, 1) = reshape(interp1(tk(:), X', tau(:)), m, n)';
-Q(:, :, 2) = reshape(interp1(tk(:), Yv', tau(:)), m, n)';
+Q(:, :, 1) = reshape(lerp1(tk, X', tau), m, n)';
+Q(:, :, 2) = reshape(lerp1(tk, Yv', tau), m, n)';
 % uncertainty radius (0 at the last observation, conformal after that)
 Rk = [zeros(n, 1), pred.R];
-Rad = reshape(interp1(tk(:), Rk', tau(:)), m, n)';
+Rad = reshape(lerp1(tk, Rk', tau), m, n)';
 end

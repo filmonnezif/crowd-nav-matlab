@@ -26,8 +26,7 @@ if n > 0 && isfinite(dtS) && dtS > 0
         if u >= T(end, 1)
             G(i, :) = T(end, 2:3);
         else
-            G(i, 1) = interp1(T(:, 1), T(:, 2), u);
-            G(i, 2) = interp1(T(:, 1), T(:, 3), u);
+            G(i, :) = lerp1(T(:, 1), T(:, 2:3), u);
         end
     end
     vdes = (G - P) / cfg.crowdLook;

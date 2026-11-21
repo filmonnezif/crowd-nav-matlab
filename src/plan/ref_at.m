@@ -17,7 +17,7 @@ if size(path, 2) >= 3
         return
     end
     tq = min(max(tNow + tau, tk(1)), tk(end));
-    R = [interp1(tk, p(:, 1), tq), interp1(tk, p(:, 2), tq)];
+    R = lerp1(tk, p, tq);
     return
 end
 d = hypot(path(:, 1) - x(1), path(:, 2) - x(2));
@@ -31,5 +31,5 @@ if numel(s) == 1
     return
 end
 sq = min(vmax * tau, s(end));
-R = [interp1(s, p(:, 1), sq), interp1(s, p(:, 2), sq)];
+R = lerp1(s, p, sq);
 end

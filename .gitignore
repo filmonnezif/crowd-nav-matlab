@@ -4,3 +4,4 @@ results/*
 *.mex*
 .DS_Store
 models/*.mat
+!models/w_*.mat
