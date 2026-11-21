@@ -1,0 +1,193 @@
+\section{Introduction}
+A mobile robot that crosses a pedestrian area has to answer three
+questions every fraction of a second: where will each person be, how sure
+is that guess, and which motion keeps the robot clear of everyone while
+still making progress? Each question has a large literature. Trajectory
+predictors have moved from hand-made models such as Social Force
+\cite{helbing1995} to recurrent, generative and graph networks
+\cite{alahi2016,gupta2018,salzmann2020,rudenko2020}. Conformal prediction
+gives distribution-free error bounds that can be wrapped around any
+predictor \cite{vovk2005,lindemann2023,dixit2023}. Planners range from
+grid search and reactive controllers \cite{hart1968,fox1997} to model
+predictive control in space and time \cite{mavrogiannis2023}.
+
+These layers are usually studied one at a time. Prediction papers report
+displacement errors on ETH/UCY \cite{pellegrini2009,lerner2007} and stop
+there, even though a constant-velocity model is already hard to beat on
+those scenes \cite{scholler2020}. Navigation papers report collisions but
+often use one predictor. Poddar et al.\ \cite{poddar2023} showed that a
+model predictive controller drove about as safely with constant-velocity
+prediction as with a deep generative predictor. That raises the question
+this paper studies:
+\emph{when a whole navigation stack is held fixed, how much does a more
+accurate predictor, a calibrated uncertainty margin, or a better planner
+change how safely and smoothly a robot crosses a real crowd?}
+
+We answer it with one controlled benchmark built end to end in MATLAB.
+The contributions are:
+\begin{itemize}
+\item a complete, open stack with a classical and a learned option at each
+layer: Kalman tracking, seven predictors (constant velocity, Kalman,
+Social Force, MLP, LSTM, temporal CNN and a social-grid CNN), split and
+adaptive conformal uncertainty, 2-D and space-time A*, and pure pursuit,
+dynamic-window and sampling-based MPC controllers;
+\item a leak-free ETH/UCY protocol and a reactive Social Force crowd that
+follows the recorded routes but yields to the robot, so contacts can be
+attributed to the robot or to the person;
+\item a paired benchmark of 23 stack configurations on the same 120
+episodes, with bootstrap confidence intervals, which shows that the planner
+and controller dominate, that predictor accuracy is only weakly linked to
+safety, and how conformal margins trade contacts against freezing.
+\end{itemize}
+The code, trained weights and every number in this paper can be
+reproduced with the public repository.\footnote{\url{https://github.com/filmonnezif/crowd-nav-matlab}}
+
+\section{Related Work}
+\textbf{Prediction.} Social Force \cite{helbing1995} models people as
+particles pushed by goals and neighbours. Social LSTM \cite{alahi2016},
+Social GAN \cite{gupta2018} and Trajectron++ \cite{salzmann2020} learn the
+interaction from data; Rudenko et al.\ \cite{rudenko2020} survey the field.
+Sch\"oller et al.\ \cite{scholler2020} showed that constant velocity
+matches many deep models on ETH/UCY, so we keep it as the reference.
+Temporal convolutions \cite{bai2018} are a light alternative to recurrent
+networks \cite{hochreiter1997}.
+
+\textbf{Uncertainty.} Split conformal prediction \cite{vovk2005} turns
+validation errors into a radius that holds with probability $1-\alpha$ if
+test data is exchangeable with calibration data. Adaptive conformal
+inference (ACI) \cite{gibbs2021} adjusts the level online under shift.
+Lindemann et al.\ \cite{lindemann2023} and Dixit et al.\ \cite{dixit2023}
+use such radii as constraints in MPC. Gaussian processes
+\cite{rasmussen2006} and the Kalman covariance \cite{kalman1960} give
+model-based alternatives.
+
+\textbf{Planning in crowds.} A* \cite{hart1968} with pure pursuit
+\cite{coulter1992} or the dynamic window approach (DWA) \cite{fox1997} is
+the classical mobile-robot stack. Space-time search \cite{silver2005} lets
+a planner wait for a gap. Trautman and Krause \cite{trautman2010} named
+the \emph{freezing robot problem}: when every future looks possible, every
+path looks blocked. Mavrogiannis et al.\ \cite{mavrogiannis2023} review
+the open problems of social navigation, including evaluation with
+non-reactive replayed crowds, which we address with a reactive crowd.
+
+\section{System}
+Fig.~\ref{fig:system} shows the stack. Every layer has the same
+interface, so any predictor can be combined with any uncertainty method,
+planner and controller.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\scriptsize, node distance=3.5mm and 3mm,
+  box/.style={draw, rounded corners=1.5pt, align=center, minimum height=7mm, inner sep=2pt, fill=white},
+  arr/.style={-{Stealth[length=1.6mm]}, semithick}]
+\node[box, fill=gray!10] (crowd) {Crowd\\[-1pt]{\tiny replay / reactive SF}};
+\node[box, right=of crowd] (kf) {Kalman\\[-1pt]tracking};
+\node[box, right=of kf, fill=blue!6] (pred) {Predictor\\[-1pt]{\tiny CV, KF, SF,}\\[-2pt]{\tiny MLP, LSTM, TCN, SG-CNN}};
+\node[box, right=of pred, fill=orange!10] (cp) {Conformal\\[-1pt]margin $r_h$};
+\node[box, below=6mm of cp, fill=green!8] (plan) {Planner\\[-1pt]{\tiny A* / space-time A*}};
+\node[box, left=of plan, fill=green!8] (ctrl) {Controller\\[-1pt]{\tiny PP / DWA / CEM-MPC}};
+\node[box, left=of ctrl, fill=gray!10] (robot) {Diff-drive\\[-1pt]robot};
+\draw[arr] (crowd) -- node[above]{\tiny $p_t$} (kf);
+\draw[arr] (kf) -- node[above]{\tiny 8 obs.} (pred);
+\draw[arr] (pred) -- node[above]{\tiny $\hat p_{t+h}$} (cp);
+\draw[arr] (cp) -- node[right]{\tiny discs} (plan);
+\draw[arr] (pred.south) |- ([yshift=1.5mm]ctrl.east);
+\draw[arr] (plan) -- node[above]{\tiny ref.} (ctrl);
+\draw[arr] (ctrl) -- node[above]{\tiny $(v,\omega)$} (robot);
+\draw[arr, dashed] (robot.west) -- ++(-2mm,0) |- (crowd.west);
+\end{tikzpicture}
+\caption{Navigation stack. The robot's motion feeds back into the reactive
+crowd (dashed). Prediction runs every 0.4\,s for 12 steps (4.8\,s).}
+\label{fig:system}
+\end{figure}
+
+\subsection{Data and protocol}
+We use the six standard ETH/UCY scenes \cite{pellegrini2009,lerner2007}
+(ETH, Hotel, Zara1, Zara2, Univ students001/003), sampled at 2.5\,Hz.
+A prediction window is 8 observed and 12 future positions (3.2\,s and
+4.8\,s). The usual split, which takes the last 20\% of windows of each
+scene as validation, leaks: 978 validation windows share frames with
+training windows. We instead choose one split time per scene and drop
+windows that straddle it, which gives 28{,}022 training, 4{,}634
+validation and 364 ETH test windows with no overlap. ETH is held out from
+training and calibration; learned models are tuned on validation only.
+
+\subsection{Predictors}
+\emph{Constant velocity} (CV) extrapolates the last observed step.
+\emph{Kalman} runs a constant-velocity filter \cite{kalman1960} over the
+track and rolls it forward. \emph{Social Force} (SF) \cite{helbing1995}
+simulates everyone jointly with repulsion from people ahead; its strength
+and range are tuned on validation. The four networks work in each
+person's \emph{heading frame} (origin at the person, $x$ along the walking
+direction) and output a \emph{residual} over CV for all 12 steps, which
+keeps a zero-output network equal to the baseline. The MLP (38k
+parameters) sees the 7 flattened displacements, the LSTM
+\cite{hochreiter1997} (64 units, 29k) sees them as a sequence, the
+temporal CNN \cite{bai2018} (63k) applies dilated 1-D convolutions, and the
+social-grid CNN (58k) adds a 2-D CNN over a $16\times16$ grid of
+neighbours' positions and velocities (0.5\,m cells). They are trained
+with mirrored augmentation (56k samples) and early stopping. For
+simulation, the trained weights are exported and run with plain matrix
+code that matches the toolbox to within $10^{-4}$\,m.
+
+\subsection{Conformal uncertainty}
+For a predictor $f$ and horizon $h$, let $e_{i,h}=\|\hat p_{i,h}-p_{i,h}\|$
+on the $n$ validation windows. Split conformal prediction takes
+$q_h$ as the $\lceil (n+1)(1-\alpha)\rceil$-th smallest score, so a disc
+of radius $q_h$ contains the truth with probability at least $1-\alpha$
+under exchangeability \cite{vovk2005}. Because walking speed changes the
+error scale, we use the normalised score $e_{i,h}/(0.5+s_i)$ with $s_i$ the
+person's speed, so that $r_{i,h}=(0.5+s_i)\,q_h$. ACI \cite{gibbs2021}
+updates $\alpha$ online on the test stream instead. The planner sees each
+predicted person as a disc of radius $r_{\text{ped}}+r_{\text{robot}}+r_{i,h}$.
+
+\subsection{Planners and controllers}
+\textbf{2-D A*} \cite{hart1968} plans every 0.4\,s on a 0.25\,m grid. A
+predicted position $\tau$ seconds ahead is a hard obstacle where the robot
+could meet the person ($|d-v_{\max}\tau|<1$\,m) and a soft cost elsewhere.
+\textbf{Space-time A*} (ST-A*) \cite{silver2005} copies a 0.3\,m grid for
+12 time layers of 0.4\,s. From each cell the robot can wait or move to a
+neighbour, and a cell is blocked at a layer if a predicted disc covers it
+then. Because every edge moves forward in time the graph is acyclic, so
+the optimal plan is found exactly by vectorised backward dynamic
+programming in about 20\,ms. Its output is a time-stamped reference, so a
+\emph{wait} in the plan makes the reference stand still.
+
+\textbf{Pure pursuit} (PP) \cite{coulter1992} follows the path with a
+governor that slows and stops near people. \textbf{DWA} \cite{fox1997}
+scores 77 $(v,\omega)$ commands (including slow reversing) reachable within
+0.4\,s, rolled out for 2\,s against the predicted people, on progress,
+clearance, speed and smoothness. \textbf{CEM-MPC} optimises 8 commands of
+0.4\,s with the cross-entropy method \cite{rubinstein2004} (120 samples,
+3 iterations, 10\% elite, warm start). Its cost is tracking the plan's
+time-stamped reference, a clearance penalty against the predicted discs at
+the matching times, and smoothness. The robot is a unicycle of radius
+0.3\,m with $v_{\max}=1$\,m/s and $\omega_{\max}=2$\,rad/s, simulated at
+10\,Hz.
+
+We evaluate three robots: \textbf{R1} = A* + PP, \textbf{R2} = A* + DWA, and
+\textbf{R3} = ST-A* + CEM-MPC.
+
+\subsection{Reactive crowd and metrics}
+A replayed crowd never yields, so a robot that stops is walked into. In
+our \emph{reactive} crowd each recorded person is simulated with Social
+Force: they steer towards where the recording has them 1.2\,s later, are
+repelled by the robot and by each other (anisotropically, with a
+pass-on-the-right component), and are limited to 2\,m/s. Without a robot
+the simulated crowd stays 0.21\,m from the recording on average.
+Predictors observe the simulated crowd, never the ground truth future.
+
+An episode starts the robot 1\,m inside one end of the scene's long axis
+with the goal 1\,m inside the other end, so it has to cross the main
+pedestrian flow within 60\,s. Each scene gives 10 start times in
+both directions, for 120 episodes. We report: \emph{success} (goal reached
+with no contact), \emph{reached} (goal within the limit), \emph{contacts}
+per episode (body overlap events), \emph{at-fault} contacts (the robot was
+closing in at more than 0.1\,m/s), time to goal, the share of time
+stopped, and \emph{people pushed}: how far, in metres, the robot displaced
+people from where the same simulated crowd walks without it. All
+configurations run the same 120 episodes, so differences are
+\emph{paired}; we give 95\% bootstrap intervals and Wilcoxon signed-rank
+$p$-values.
+
+\input{sections/results}

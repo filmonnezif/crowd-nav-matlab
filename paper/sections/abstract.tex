@@ -1,0 +1,17 @@
+Robots that cross pedestrian areas rely on trajectory prediction, yet
+predictors are usually judged by displacement error rather than by how
+safely a robot drives with them. We build a complete navigation stack in
+MATLAB with a classical and a learned option at each layer: seven
+predictors (constant velocity, Kalman, Social Force, MLP, LSTM, temporal
+CNN and a social-grid CNN), split and adaptive conformal uncertainty, 2-D
+and space-time A*, and pure pursuit, dynamic-window and sampling-based MPC
+controllers. We evaluate 23 configurations on the same 120 episodes from
+the ETH/UCY scenes, using a leak-free split and a reactive Social Force
+crowd that follows the recorded routes. Prediction halves the contacts of
+a space-time planner (1.47 to 0.67 per episode), and space-time A* with
+MPC has 54\% fewer contacts than A* with pure pursuit. However, the learned
+predictors are up to 10\% more accurate but no safer than constant
+velocity: no paired difference is significant. Conformal margins lose
+their 90\% coverage under the shift to an unseen scene and, used as hard
+constraints, cut goal-reaching from 93\% to 55\% without reducing
+contacts. The planner, not the predictor, is the lever for safety.

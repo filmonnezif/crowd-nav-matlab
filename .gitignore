@@ -5,3 +5,9 @@ results/*
 .DS_Store
 models/*.mat
 !models/w_*.mat
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.blg
+paper/*.fls
+paper/*.fdb_latexmk

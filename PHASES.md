@@ -42,7 +42,7 @@ version with a learned one.
 - VideoWriter export for the presentation
 - `demo_phase6`: side-by-side video, stills, summary CSV and an interactive viewer (`view_episodes`)
 
-## Phase 7 — Experiments and paper
-- Full grid: predictors × uncertainty on/off × planners × scenes
-- Prediction accuracy vs navigation safety (does a better ADE give fewer collisions?)
-- Write-up
+## Phase 7 — Experiments and paper  ✅ done
+- Full grid: predictors × uncertainty on/off × planners × scenes (23 configurations × 120 episodes, `run_phase7`)
+- Prediction accuracy vs navigation safety (does a better ADE give fewer collisions?) — no: see README
+- Write-up: 6-page IEEE conference paper in `paper/` (`paper/main.pdf`)

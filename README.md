@@ -459,3 +459,63 @@ The drawing code is shared: `scene_view_init` / `scene_view_draw` draw
 one episode view, used by `animate_episode`, `animate_compare` and
 `view_episodes`. `make_obstacle_fcn(name, struct('showAlpha', 0.1))`
 attaches display-only uncertainty radii (`log.pred{k}.Rshow`).
+
+## Phase 7: the full experiment grid and the paper
+
+`experiments/phase7_jobs.m` lists 23 configurations, all in the reactive
+crowd and all on the same 120 episodes:
+
+* **R1** = A* + pure pursuit, **R2** = A* + DWA, **R3** = space-time A* + MPC;
+* every predictor in R3 (none, cv, kalman, sf, mlp, lstm, tcn, sgcnn), six in R2, two in R1;
+* conformal margins at 50/70/90% coverage for cv and lstm in R3;
+* R3 + cv in the replayed crowd for reference.
+
+Run it with `run_phase7(worker, nWorkers)` in 4 parallel Octave or MATLAB
+sessions (about 2 h in total). Each configuration writes
+`results/phase7/<tag>.csv`, and finished ones are skipped on restart. The
+learned predictors run without the Deep Learning Toolbox:
+`export_weights` saves `models/w_<name>.mat` (committed), and
+`net_forward` reproduces the network output with plain matrix code.
+
+`python3 paper/analyze.py` turns the CSVs into the paper's tables,
+figures and paired statistics (bootstrap intervals, Wilcoxon tests).
+
+| Robot | Predictor | Success | Reached | Contacts / ep [95% CI] | At-fault | Univ. contacts | Pushed (m) |
+|---|---|---|---|---|---|---|---|
+| R1 | none | 25% | 88% | 2.28 [1.88, 2.73] | 0.00 | 4.17 | 0.66 |
+| R1 | cv | 48% | 88% | 1.47 [1.12, 1.83] | 0.00 | 3.00 | 0.42 |
+| R2 | none | 41% | 91% | 1.23 [0.97, 1.50] | 0.18 | 1.82 | 0.47 |
+| R2 | cv | 50% | 92% | 0.87 [0.67, 1.09] | 0.45 | 1.43 | 0.24 |
+| R2 | lstm | 52% | 90% | 0.93 [0.68, 1.20] | 0.41 | 1.43 | 0.27 |
+| R2 | tcn | 53% | 88% | 0.77 [0.57, 0.99] | 0.39 | 1.20 | 0.27 |
+| R3 | none | 36% | 86% | 1.47 [1.18, 1.77] | 0.37 | 2.27 | 0.47 |
+| R3 | **cv** | 52% | 93% | **0.67** [0.49, 0.86] | 0.47 | **0.80** | 0.23 |
+| R3 | kalman | 57% | 91% | 0.75 [0.53, 1.00] | 0.56 | 1.12 | 0.23 |
+| R3 | lstm | 52% | 97% | 0.77 [0.57, 0.98] | 0.47 | 1.10 | 0.25 |
+| R3 | sgcnn | 56% | 91% | 0.77 [0.56, 1.00] | 0.51 | 1.20 | 0.26 |
+| R3 | cv + 90% conformal | 35% | 55% | 0.78 [0.58, 0.99] | 0.48 | 1.27 | 0.10 |
+
+(Full table in `paper/main.pdf`, Table III.)
+
+What the grid shows:
+
+1. **Prediction matters, but which predictor does not.** CV prediction
+   cuts R3's contacts from 1.47 to 0.67 per episode (p < 0.001). The six
+   other predictors are up to 10% more accurate on ETH, yet all have
+   0.08–0.11 more contacts than CV in R3, none significantly (p ≥ 0.23).
+   Rank correlation between ETH FDE and contacts is −0.71 (p = 0.07).
+2. **The planner and controller are the lever.** With CV, DWA removes
+   0.60 contacts per episode against pure pursuit (p = 0.010), and
+   space-time A* + MPC another 0.20 (p = 0.017): −54% overall.
+3. **Conformal margins as hard constraints freeze the robot.** Reached
+   falls 93 → 83 → 73 → 55% at 50/70/90% coverage and university success
+   30 → 0%, with no drop in contacts.
+4. **Replayed crowds overstate contacts** (0.92 vs 0.67, p = 0.002), with the
+   same at-fault rate.
+
+### The paper
+
+`paper/main.tex` (IEEEtran conference format, 5 pages + references) builds with
+`cd paper && latexmk -pdf main.tex`. `paper/generated/` and `paper/figs/`
+come from `analyze.py`; `fig_scene.png` comes from
+`experiments/paper_scene_figure.m`.
